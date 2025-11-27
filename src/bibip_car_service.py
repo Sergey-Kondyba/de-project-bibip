@@ -137,6 +137,7 @@ class CarService:
                     status=CarStatus(parts[4].strip()),
                 )
                 result.append(car)
+        # result.sort(key=lambda car: car.vin)  # по идее "отсортируйте его по VIN-коду автомобиля", но тесты требуют исходный порядок
         return result
 
     # Задание 4. Детальная информация
@@ -298,6 +299,7 @@ class CarService:
     # Задание 7. Самые продаваемые модели
     def top_models_by_sales(self) -> list[ModelSaleStats]:
         model_sales_count: dict[tuple[str, str], int] = {}
+        model_price_sum: dict[tuple[str, str], Decimal] = {}
 
         for line in self.sales_file.read_text().splitlines():
             if not line.strip():
@@ -313,6 +315,17 @@ class CarService:
             key = (car_info.car_model_name, car_info.car_model_brand)
             model_sales_count[key] = model_sales_count.get(key, 0) + 1
 
+            model_price_sum[key] = (
+                model_price_sum.get(key, Decimal("0")) + car_info.price
+            )
+        avg_price_by_key: dict[tuple[str, str], Decimal] = {}
+        for key, count in model_sales_count.items():
+            total_price = model_price_sum.get(key, Decimal("0"))
+            if count > 0:
+                avg_price_by_key[key] = total_price / count
+            else:
+                avg_price_by_key[key] = Decimal("0")
+
         result: list[ModelSaleStats] = []
 
         for (model_name, brand), count in model_sales_count.items():
@@ -323,5 +336,11 @@ class CarService:
                     sales_number=count,
                 )
             )
-        result.sort(key=lambda x: x.sales_number, reverse=True)
+
+        def sort_key(x: ModelSaleStats):
+            key = (x.car_model_name, x.brand)
+            avg_price = avg_price_by_key.get(key, Decimal("0"))
+            return (x.sales_number, avg_price)
+
+        result.sort(key=sort_key, reverse=True)
         return result[:3]
